@@ -8,15 +8,16 @@ local shared = require 'netease-music.shared'
 local function playlist_keymap()
   local keymap = config.get().keymap
   return {
-    [keymap.append_playlist_to_player] = { callback = actions.append_playlist_entry, desc = 'append playlist to player' },
+    [keymap.append_playlist_to_player] = { callback = actions.append_playlist_entry, desc = '追加歌单到播放器' },
   }
 end
 
 local function song_keymap()
   local keymap = config.get().keymap
   return {
-    [keymap.play_now] = { callback = actions.play_song_entry, desc = 'play now' },
-    [keymap.append_to_player] = { callback = actions.append_song_entry, desc = 'append to player' },
+    [keymap.play_now] = { callback = actions.play_song_entry, desc = '立即播放' },
+    [keymap.append_to_player] = { callback = actions.append_song_entry, desc = '追加到播放器' },
+    [keymap.toggle_like] = { callback = actions.toggle_song_like_entry, desc = '切换喜欢状态' },
   }
 end
 
@@ -43,6 +44,31 @@ local function build_song_entry(song, playlist)
   }
 end
 
+function M.build_song_entry(song, playlist)
+  return build_song_entry(song, playlist)
+end
+
+function M.list_liked_songs_entries(cb)
+  api.list_liked_songs(function(songs, err)
+    if err then
+      cb(nil, err)
+      return
+    end
+
+    local liked_playlist = {
+      id = 'liked-songs',
+      name = '我喜欢的音乐',
+      creator = { nickname = '我' },
+    }
+    local entries = {}
+    for _, song in ipairs(songs or {}) do
+      table.insert(entries, build_song_entry(song, liked_playlist))
+    end
+    if #entries == 0 then entries = { empty_entry '还没有喜欢的歌曲' } end
+    cb(entries)
+  end)
+end
+
 local function empty_entry(message)
   return {
     key = 'empty',
@@ -63,7 +89,7 @@ function M.list(path, cb)
   local source = path[2]
   local loader = sources[source]
   if not loader then
-    cb({}, 'unknown playlist source: ' .. tostring(source))
+    cb({}, '未知的歌单来源：' .. tostring(source))
     return
   end
 
@@ -78,7 +104,7 @@ function M.list(path, cb)
       for _, playlist in ipairs(playlists or {}) do
         table.insert(entries, build_playlist_entry(playlist))
       end
-      if #entries == 0 then entries = { empty_entry 'No playlists available' } end
+      if #entries == 0 then entries = { empty_entry '当前没有可用歌单' } end
       cb(entries)
     end)
     return
@@ -94,7 +120,7 @@ function M.list(path, cb)
     for _, song in ipairs(songs or {}) do
       table.insert(entries, build_song_entry(song, playlist))
     end
-    if #entries == 0 then entries = { empty_entry 'This playlist has no songs' } end
+    if #entries == 0 then entries = { empty_entry '这个歌单里没有歌曲' } end
     cb(entries)
   end)
 end

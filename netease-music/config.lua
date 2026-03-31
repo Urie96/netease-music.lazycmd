@@ -17,6 +17,7 @@ local cfg = {
     append_to_player = 'a',
     append_playlist_to_player = 'A',
     search = 's',
+    toggle_like = 'l',
     play_now = '<enter>',
   },
 }

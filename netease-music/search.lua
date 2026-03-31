@@ -5,19 +5,28 @@ local api = require 'netease-music.api'
 local config = require 'netease-music.config'
 local shared = require 'netease-music.shared'
 
+local function kind_label(kind)
+  if kind == 'song' then return '歌曲' end
+  if kind == 'album' then return '专辑' end
+  if kind == 'artist' then return '歌手' end
+  if kind == 'playlist' then return '歌单' end
+  return tostring(kind or '-')
+end
+
 local function search_keymap()
   local keymap = config.get().keymap
   return {
-    [keymap.search] = { callback = actions.open_search_input, desc = 'search again' },
+    [keymap.search] = { callback = actions.open_search_input, desc = '重新搜索' },
   }
 end
 
 local function song_keymap()
   local keymap = config.get().keymap
   return {
-    [keymap.play_now] = { callback = actions.play_song_entry, desc = 'play now' },
-    [keymap.append_to_player] = { callback = actions.append_song_entry, desc = 'append to player' },
-    [keymap.search] = { callback = actions.open_search_input, desc = 'search again' },
+    [keymap.play_now] = { callback = actions.play_song_entry, desc = '立即播放' },
+    [keymap.append_to_player] = { callback = actions.append_song_entry, desc = '追加到播放器' },
+    [keymap.toggle_like] = { callback = actions.toggle_song_like_entry, desc = '切换喜欢状态' },
+    [keymap.search] = { callback = actions.open_search_input, desc = '重新搜索' },
   }
 end
 
@@ -27,13 +36,13 @@ local function list_search_root(cb)
     {
       key = 'prompt',
       kind = 'info',
-      display = lc.style.line { shared.titlec(('Press %s to search songs, albums, artists and playlists'):format(keymap.search)) },
+      display = lc.style.line { shared.titlec(('按 %s 搜索歌曲、专辑、歌手和歌单'):format(keymap.search)) },
       keymap = search_keymap(),
       preview = function(_, done)
         done(shared.preview_lines {
-          lc.style.line { shared.titlec 'Search Netease Music' },
+          lc.style.line { shared.titlec '搜索网易云音乐' },
           '',
-          lc.style.line { shared.dim 'Search uses /cloudsearch and groups results by song, album, artist and playlist.' },
+          lc.style.line { shared.dim '搜索基于 /cloudsearch，并按歌曲、专辑、歌手、歌单分组展示。' },
         })
       end,
     },
@@ -42,12 +51,12 @@ end
 
 local function group_display(kind, count)
   local color = kind == 'artist' and shared.mag or (kind == 'album' and shared.warm or (kind == 'playlist' and shared.okc or shared.accent))
-  local title = kind:gsub('^%l', string.upper)
+  local title = kind_label(kind)
   return lc.style.line {
     color(title),
     shared.dim '  ·  ',
     shared.okc(count),
-    shared.dim(' ' .. title .. (count == 1 and '' or 's')),
+    shared.dim(' ' .. title),
   }
 end
 
@@ -71,11 +80,11 @@ local function list_search_groups(query, cb)
         keymap = search_keymap(),
         preview = function(entry, done)
           done(shared.preview_lines {
-            lc.style.line { shared.titlec 'Search results' },
+            lc.style.line { shared.titlec '搜索结果' },
             '',
-            shared.kv_line('Query', entry.query or '-', 'accent'),
-            shared.kv_line('Type', entry.search_kind or '-', 'warm'),
-            shared.kv_line('Count', tostring(entry.count or 0), 'accent'),
+            shared.kv_line('关键词', entry.query or '-', 'accent'),
+            shared.kv_line('类型', kind_label(entry.search_kind), 'warm'),
+            shared.kv_line('数量', tostring(entry.count or 0), 'accent'),
           })
         end,
       })
@@ -101,14 +110,14 @@ local function build_album_entry(album)
     kind = 'info',
     display = shared.format_album_display(album),
     keymap = search_keymap(),
-    preview = function(_, cb)
-      cb(shared.preview_lines {
-        lc.style.line { shared.warm(album.name or 'Album') },
-        '',
-        shared.kv_line('Artist', shared.song_artists { artists = album.artists or {} }, 'accent'),
-        shared.kv_line('Album ID', tostring(album.id or '-')),
-      })
-    end,
+        preview = function(_, cb)
+          cb(shared.preview_lines {
+        lc.style.line { shared.warm(album.name or '专辑') },
+            '',
+        shared.kv_line('歌手', shared.song_artists { artists = album.artists or {} }, 'accent'),
+        shared.kv_line('专辑 ID', tostring(album.id or '-')),
+          })
+        end,
   }
 end
 
@@ -118,14 +127,14 @@ local function build_artist_entry(artist)
     kind = 'info',
     display = shared.format_artist_display(artist),
     keymap = search_keymap(),
-    preview = function(_, cb)
-      cb(shared.preview_lines {
-        lc.style.line { shared.mag(artist.name or 'Artist') },
-        '',
-        shared.kv_line('Artist ID', tostring(artist.id or '-')),
-        shared.kv_line('Alias', artist.alias and table.concat(artist.alias, ', ') or '-'),
-      })
-    end,
+        preview = function(_, cb)
+          cb(shared.preview_lines {
+        lc.style.line { shared.mag(artist.name or '歌手') },
+            '',
+        shared.kv_line('歌手 ID', tostring(artist.id or '-')),
+        shared.kv_line('别名', artist.alias and table.concat(artist.alias, ', ') or '-'),
+          })
+        end,
   }
 end
 
@@ -137,8 +146,8 @@ local function build_playlist_entry(playlist)
     playlist = playlist,
     display = shared.format_playlist_display(playlist),
     keymap = {
-      [keymap.append_playlist_to_player] = { callback = actions.append_playlist_entry, desc = 'append playlist to player' },
-      [keymap.search] = { callback = actions.open_search_input, desc = 'search again' },
+      [keymap.append_playlist_to_player] = { callback = actions.append_playlist_entry, desc = '追加歌单到播放器' },
+      [keymap.search] = { callback = actions.open_search_input, desc = '重新搜索' },
     },
     preview = function(_, cb) cb(shared.playlist_preview(playlist)) end,
   }
@@ -176,14 +185,14 @@ local function list_search_items(query, kind, cb)
         {
           key = 'empty',
           kind = 'info',
-          display = lc.style.line { shared.dim('No ' .. kind .. ' matched this query') },
+          display = lc.style.line { shared.dim('没有匹配当前关键词的结果') },
           keymap = search_keymap(),
           preview = function(_, done)
             done(shared.preview_lines {
-              lc.style.line { shared.dim 'No results' },
+              lc.style.line { shared.dim '没有结果' },
               '',
-              shared.kv_line('Query', query, 'accent'),
-              shared.kv_line('Type', kind, 'warm'),
+              shared.kv_line('关键词', query, 'accent'),
+              shared.kv_line('类型', kind_label(kind), 'warm'),
             })
           end,
         },
@@ -219,7 +228,7 @@ local function list_search_playlist_detail(playlist_id, cb)
         {
           key = 'empty',
           kind = 'info',
-          display = lc.style.line { shared.dim 'This playlist has no songs' },
+          display = lc.style.line { shared.dim '这个歌单里没有歌曲' },
           keymap = search_keymap(),
           preview = function(_, done) done(shared.playlist_preview(playlist)) end,
         },

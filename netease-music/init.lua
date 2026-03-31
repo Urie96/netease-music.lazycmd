@@ -11,14 +11,14 @@ local function config_entries(err)
     {
       key = 'configure',
       kind = 'info',
-      display = lc.style.line { lc.style.span('Configure Netease Music via setup()'):fg 'yellow' },
+      display = lc.style.line { lc.style.span('请通过 setup() 配置网易云音乐插件'):fg 'yellow' },
       preview = function(_, cb)
         cb(shared.preview_lines {
-          lc.style.line { shared.titlec 'Netease Music setup' },
+          lc.style.line { shared.titlec '网易云音乐插件配置' },
           '',
-          shared.kv_line('base_url', 'NeteaseCloudMusicApi endpoint', 'accent'),
-          shared.kv_line('cookie', 'optional, enables daily and private data', 'warm'),
-          shared.kv_line('uid', 'optional, used for user/playlist', 'accent'),
+          shared.kv_line('base_url', 'NeteaseCloudMusicApi 服务地址', 'accent'),
+          shared.kv_line('cookie', '可选，用于每日推荐和私人数据', 'warm'),
+          shared.kv_line('uid', '可选，用于用户歌单', 'accent'),
           '',
           lc.style.line { shared.dim(tostring(err)) },
         })
@@ -62,7 +62,7 @@ function M.preview(entry, cb)
   end
 
   cb(shared.preview_lines {
-    lc.style.line { shared.titlec(entry.key or 'Netease Music') },
+    lc.style.line { shared.titlec(entry.key or '网易云音乐') },
   })
 end
 

@@ -5,15 +5,17 @@
 ## 功能
 
 - 一级目录显示：
-  - `Account`：查看 `base_url` / `cookie` / `uid` 配置和登录状态
-  - `Daily Playlists`：每日推荐歌单，需要登录
-  - `Daily Songs`：每日推荐歌曲，需要登录
-  - `My Playlists`：用户歌单，需要 `uid` 或可用登录态
-  - `Personalized`：推荐歌单
-  - `Top Playlists`：热门歌单
-  - `Search`：搜索歌曲、专辑、歌手、歌单
+  - `账号`：查看 `base_url` / `cookie` / `uid` 配置和登录状态
+  - `每日推荐歌单`：每日推荐歌单，需要登录
+  - `每日推荐歌曲`：每日推荐歌曲，需要登录
+  - `我的歌单`：用户歌单，需要 `uid` 或可用登录态
+  - `我喜欢的音乐`：我喜欢的歌曲列表，需要登录
+  - `推荐歌单`：推荐歌单
+  - `热门歌单`：热门歌单
+  - `搜索`：搜索歌曲、专辑、歌手、歌单
 - 歌单页支持进入查看歌曲列表
 - 歌曲预览会显示基础元数据，并尝试加载歌词前几行
+- 歌曲条目会显示喜欢状态；按 `l` 可切换喜欢/取消喜欢
 - 在歌曲上按 `Enter`：从当前歌曲开始替换 `mpv` 队列并播放
 - 在歌曲上按 `a`：把当前歌曲追加到 `mpv` 队列
 - 在歌单上按 `A`：把整个歌单追加到 `mpv` 队列
@@ -52,6 +54,7 @@
         append_to_player = 'a',
         append_playlist_to_player = 'A',
         search = 's',
+        toggle_like = 'l',
         play_now = '<enter>',
       },
     }
@@ -80,6 +83,10 @@
 - `/personalized`
 - `/top/playlist`
 - `/user/playlist`
+- `/likelist`
+- `/song/detail`
+- `/song/like/check`
+- `/like`
 - `/recommend/resource`
 - `/recommend/songs`
 - `/playlist/detail`
@@ -90,5 +97,6 @@
 
 ## 说明
 
-- 这个插件目前聚焦“浏览 + 搜索 + 播放”主流程，没有实现二维码登录、喜欢/取消喜欢、歌单编辑等写操作
-- `Daily Playlists`、`Daily Songs`、`My Playlists` 是否可用，取决于接口服务端是否接受当前 `cookie`
+- 这个插件目前聚焦“浏览 + 搜索 + 播放”主流程；已支持喜欢/取消喜欢，但还没有实现二维码登录和歌单编辑等写操作
+- `每日推荐歌单`、`每日推荐歌曲`、`我的歌单` 是否可用，取决于接口服务端是否接受当前 `cookie`
+- API 响应会同时走内存缓存和 `lc.cache` 持久化缓存，TTL 按接口性质区分：登录态 60 秒，公开推荐/热门歌单 12 小时，我的歌单 3 小时，每日推荐 12 小时，歌单详情 3 小时，搜索 1 天，播放 URL 30 分钟，歌词 30 天

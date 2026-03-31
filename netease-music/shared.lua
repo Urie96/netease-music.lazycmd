@@ -8,6 +8,7 @@ function M.warm(text) return lc.style.span(tostring(text or '')):fg 'yellow' end
 function M.okc(text) return lc.style.span(tostring(text or '')):fg 'green' end
 function M.mag(text) return lc.style.span(tostring(text or '')):fg 'magenta' end
 function M.titlec(text) return lc.style.span(tostring(text or '')):fg 'white' end
+function M.liked_icon() return lc.style.span(' '):fg 'red' end
 
 local function aligned_line(line) return { line = line, align = true } end
 
@@ -53,14 +54,14 @@ end
 
 function M.show_error(err)
   lc.notify(lc.style.line {
-    lc.style.span('Netease Music: '):fg 'red',
+    lc.style.span('网易云音乐：'):fg 'red',
     lc.style.span(tostring(err)):fg 'red',
   })
 end
 
 function M.show_info(msg)
   lc.notify(lc.style.line {
-    lc.style.span('Netease Music: '):fg 'cyan',
+    lc.style.span('网易云音乐：'):fg 'cyan',
     lc.style.span(tostring(msg)):fg 'white',
   })
 end
@@ -94,7 +95,7 @@ function M.song_artists(song)
     table.insert(names, artist.name or artist.nickname or tostring(artist.id or '?'))
   end
   if #names == 0 and song.pc and song.pc.artist then return tostring(song.pc.artist) end
-  return #names > 0 and table.concat(names, ', ') or 'Unknown artist'
+  return #names > 0 and table.concat(names, ', ') or '未知歌手'
 end
 
 function M.playlist_creator_name(playlist)
@@ -105,6 +106,7 @@ end
 
 function M.format_song_display(song)
   return lc.style.line {
+    song.liked == true and M.liked_icon() or M.dim '  ',
     M.titlec(M.song_title(song)),
     M.dim '  [',
     M.accent(M.song_artists(song)),
@@ -113,19 +115,12 @@ function M.format_song_display(song)
 end
 
 function M.format_playlist_display(playlist)
-  local count = tonumber(playlist.trackCount or playlist.songCount or 0) or 0
-  return lc.style.line {
-    M.warm(playlist.name or playlist.id or 'Playlist'),
-    M.dim '  ·  ',
-    M.okc(count),
-    M.dim ' songs  ·  ',
-    M.mag(M.playlist_creator_name(playlist)),
-  }
+  return lc.style.line { M.warm(playlist.name or playlist.id or '歌单') }
 end
 
 function M.format_artist_display(artist)
   return lc.style.line {
-    M.mag(artist.name or artist.id or 'Artist'),
+    M.mag(artist.name or artist.id or '歌手'),
     artist.alias and #artist.alias > 0 and M.dim('  ·  ' .. table.concat(artist.alias, ' / ')) or '',
   }
 end
@@ -133,7 +128,7 @@ end
 function M.format_album_display(album)
   local artist = M.song_artists { artists = album.artists or album.ar or {} }
   return lc.style.line {
-    M.warm(album.name or album.id or 'Album'),
+    M.warm(album.name or album.id or '专辑'),
     M.dim '  ·  ',
     M.accent(artist),
   }
@@ -157,18 +152,19 @@ function M.song_preview(song, cb)
     local lines = {
       lc.style.line { M.titlec(M.song_title(song)) },
       '',
-      M.kv_line('Artist', M.song_artists(song), 'accent'),
-      M.kv_line('Album', M.song_album(song), 'warm'),
-      M.kv_line('Duration', M.format_duration(song.dt or song.duration), 'accent'),
-      M.kv_line('Song ID', tostring(song.id or '-')),
+      M.kv_line('歌手', M.song_artists(song), 'accent'),
+      M.kv_line('专辑', M.song_album(song), 'warm'),
+      M.kv_line('时长', M.format_duration(song.dt or song.duration), 'accent'),
+      M.kv_line('喜欢', tostring(song.liked == true), song.liked == true and 'warm' or 'mag'),
+      M.kv_line('歌曲 ID', tostring(song.id or '-')),
     }
 
     if err then
       table.insert(lines, '')
-      table.insert(lines, lc.style.line { M.dim('Lyric unavailable: ' .. tostring(err)) })
+      table.insert(lines, lc.style.line { M.dim('歌词不可用：' .. tostring(err)) })
     elseif #lyric_lines > 0 then
       table.insert(lines, '')
-      table.insert(lines, lc.style.line { M.accent 'Lyric' })
+      table.insert(lines, lc.style.line { M.accent '歌词' })
       for _, line in ipairs(lyric_lines) do
         table.insert(lines, line)
       end
@@ -180,14 +176,13 @@ end
 
 function M.playlist_preview(playlist)
   return M.preview_lines {
-    lc.style.line { M.warm(playlist.name or 'Playlist') },
+    lc.style.line { M.warm(playlist.name or '歌单') },
     '',
-    M.kv_line('Creator', M.playlist_creator_name(playlist), 'accent'),
-    M.kv_line('Songs', tostring(playlist.trackCount or playlist.songCount or 0), 'accent'),
-    M.kv_line('Play Count', tostring(playlist.playCount or '-'), 'warm'),
-    M.kv_line('Subscribed', tostring(playlist.subscribedCount or '-'), 'mag'),
+    M.kv_line('歌曲数', tostring(playlist.trackCount or playlist.songCount or 0) .. ' 首', 'accent'),
+    M.kv_line('播放次数', tostring(playlist.playCount or '-'), 'warm'),
+    M.kv_line('收藏数', tostring(playlist.subscribedCount or '-'), 'mag'),
     '',
-    lc.style.line { M.dim(playlist.description or 'No description') },
+    lc.style.line { M.dim(playlist.description or '暂无简介') },
   }
 end
 
@@ -195,15 +190,15 @@ function M.account_preview(data, cfg)
   local profile = data and data.profile or {}
   local account = data and data.account or {}
   return M.preview_lines {
-    lc.style.line { M.titlec 'Account' },
+    lc.style.line { M.titlec '账号' },
     '',
-    M.kv_line('Base URL', cfg.base_url or '-', 'accent'),
-    M.kv_line('Cookie', api.get_cookie() and 'configured' or 'missing', api.get_cookie() and 'warm' or 'mag'),
+    M.kv_line('服务地址', cfg.base_url or '-', 'accent'),
+    M.kv_line('Cookie', api.get_cookie() and '已配置' or '未配置', api.get_cookie() and 'warm' or 'mag'),
     M.kv_line('UID', api.get_uid() or cfg.uid or '-', 'accent'),
-    M.kv_line('Nickname', profile.nickname or '-', 'warm'),
-    M.kv_line('User ID', tostring(profile.userId or account.id or '-'), 'accent'),
+    M.kv_line('昵称', profile.nickname or '-', 'warm'),
+    M.kv_line('用户 ID', tostring(profile.userId or account.id or '-'), 'accent'),
     '',
-    lc.style.line { M.dim 'Configure cookie/uid in setup() for personal playlists and daily recommendations.' },
+    lc.style.line { M.dim '请在 setup() 中配置 cookie/uid，以使用我的歌单和每日推荐。' },
   }
 end
 

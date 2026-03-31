@@ -9,29 +9,26 @@ local function hovered_entry() return lc.api.page_get_hovered() end
 local function get_mpv()
   local ok, mod = pcall(require, 'mpv')
   if ok and mod then return mod end
-  shared.show_error('mpv plugin is required: add { dir = "plugins/mpv.lazycmd" } to lc.config.plugins')
+  shared.show_error '需要先启用 mpv 插件：请在 lc.config.plugins 中加入 { dir = "plugins/mpv.lazycmd" }'
   return nil
-end
-
-local function reload_if_player_visible()
-  local path = lc.api.get_current_path() or {}
-  if path[1] == 'mpv' then lc.cmd 'reload' end
 end
 
 local function player_preview(entry)
   local meta = entry.mpv_meta or {}
   local item = entry.player_item or {}
   local player = entry.player or {}
+  local url = meta.url or item.filename or item.url or '-'
 
   return shared.preview_lines {
-    lc.style.line { shared.okc 'mpv queue' },
+    lc.style.line { shared.okc 'mpv 队列' },
     '',
-    shared.kv_line('State', player.pause and 'paused' or 'playing', player.pause and 'warm' or 'accent'),
-    shared.kv_line('Current', tostring(item.current == true or item.playing == true), 'accent'),
-    shared.kv_line('Title', meta.title or item.title or '-'),
-    shared.kv_line('Artist', meta.artist or '-'),
-    shared.kv_line('Album', meta.album or '-'),
-    shared.kv_line('Duration', shared.format_duration(meta.duration or 0), 'accent'),
+    shared.kv_line('状态', player.pause and '暂停' or '播放中', player.pause and 'warm' or 'accent'),
+    shared.kv_line('当前播放', tostring(item.current == true or item.playing == true), 'accent'),
+    shared.kv_line('标题', meta.title or item.title or '-'),
+    shared.kv_line('歌手', meta.artist or '-'),
+    shared.kv_line('专辑', meta.album or '-'),
+    shared.kv_line('时长', shared.format_duration(meta.duration or 0), 'accent'),
+    shared.kv_line('URL', url),
   }
 end
 
@@ -45,6 +42,8 @@ local function build_mpv_track(song, url_info)
     artist = shared.song_artists(song),
     album = shared.song_album(song),
     duration = song.dt or song.duration,
+    liked = song.liked == true,
+    url = url_info.url,
     source = 'netease-music',
     display = function(item, player, meta)
       local current = item.current or item.playing
@@ -52,6 +51,7 @@ local function build_mpv_track(song, url_info)
       if current then marker = player.pause and shared.warm '⏸ ' or shared.okc '▶ ' end
       return lc.style.line {
         marker,
+        meta.liked == true and shared.liked_icon() or shared.dim '  ',
         shared.titlec(meta.title or item.title or '-'),
         shared.dim '  [',
         shared.accent(meta.artist or '-'),
@@ -67,9 +67,55 @@ local function build_mpv_track(song, url_info)
       return preview
     end,
     keymap = {
-      [keymap.search] = { callback = M.open_search_input, desc = 'search music' },
+      [keymap.search] = { callback = M.open_search_input, desc = '搜索音乐' },
+      [keymap.toggle_like] = { callback = M.toggle_song_like_entry, desc = '切换喜欢状态' },
     },
   }
+end
+
+local function set_song_like_local(song_id, liked)
+  local entries = lc.api.page_get_entries() or {}
+  local path = lc.api.get_current_path() or {}
+  local is_liked_page = path[1] == 'netease-music' and path[2] == 'liked'
+  local next_entries = {}
+  local updated = false
+  for _, entry in ipairs(entries) do
+    if entry.kind == 'song' and entry.song and tostring(entry.song.id) == tostring(song_id) then
+      if is_liked_page and liked ~= true then
+        updated = true
+      else
+        entry.song.liked = liked == true
+        entry.display = shared.format_song_display(entry.song)
+        table.insert(next_entries, entry)
+        updated = true
+      end
+    elseif entry.mpv_meta and tostring(entry.mpv_meta.id) == tostring(song_id) then
+      entry.mpv_meta.liked = liked == true
+      table.insert(next_entries, entry)
+      updated = true
+    else
+      table.insert(next_entries, entry)
+    end
+  end
+
+  if not updated then return end
+
+  if is_liked_page and #next_entries == 0 then
+    next_entries = {
+      {
+        key = 'empty',
+        kind = 'info',
+        display = lc.style.line { shared.dim '还没有喜欢的歌曲' },
+        preview = function(_, cb) cb(shared.preview_lines { '还没有喜欢的歌曲' }) end,
+      },
+    }
+  end
+
+  lc.api.page_set_entries(next_entries)
+  local hovered = lc.api.page_get_hovered()
+  if hovered and type(hovered.preview) == 'function' then
+    hovered:preview(function(preview) lc.api.page_set_preview(preview) end)
+  end
 end
 
 local function collect_playable_tracks(songs, cb)
@@ -101,8 +147,8 @@ end
 
 function M.open_search_input()
   lc.input {
-    prompt = 'Search Netease Music',
-    placeholder = 'keyword',
+    prompt = '搜索网易云音乐',
+    placeholder = '请输入关键词',
     on_submit = function(input)
       local query = tostring(input or ''):trim()
       if query == '' then
@@ -145,20 +191,19 @@ function M.play_song_entry()
       return
     end
     if #tracks == 0 then
-      shared.show_error 'No playable tracks in current selection'
+      shared.show_error '当前选择中没有可播放的歌曲'
       return
     end
 
-    mpv.play_tracks(tracks)
+    mpv
+      .play_tracks(tracks)
       :next(function()
-        local msg = 'Sent tracks to mpv queue'
-        if skipped and skipped > 0 then msg = msg .. (' (' .. skipped .. ' skipped)') end
+        local msg = '已发送歌曲到 mpv 队列'
+        if skipped and skipped > 0 then msg = msg .. ('（跳过 ' .. skipped .. ' 首）') end
         shared.show_info(msg)
-        reload_if_player_visible()
+        lc.cmd 'reload'
       end)
-      :catch(function(play_err)
-        shared.show_error(play_err)
-      end)
+      :catch(function(play_err) shared.show_error(play_err) end)
   end)
 
   return true
@@ -177,18 +222,17 @@ function M.append_song_entry()
       return
     end
     if #tracks == 0 then
-      shared.show_error 'Current song is not playable'
+      shared.show_error '当前歌曲不可播放'
       return
     end
 
-    mpv.append_tracks(tracks)
+    mpv
+      .append_tracks(tracks)
       :next(function()
-        shared.show_info 'Song appended to mpv queue'
-        reload_if_player_visible()
+        shared.show_info '已追加歌曲到 mpv 队列'
+        lc.cmd 'reload'
       end)
-      :catch(function(append_err)
-        shared.show_error(append_err)
-      end)
+      :catch(function(append_err) shared.show_error(append_err) end)
   end)
 
   return true
@@ -213,21 +257,53 @@ function M.append_playlist_entry()
         return
       end
       if #tracks == 0 then
-        shared.show_error 'No playable songs in this playlist'
+        shared.show_error '这个歌单里没有可播放的歌曲'
         return
       end
 
-      mpv.append_tracks(tracks)
+      mpv
+        .append_tracks(tracks)
         :next(function()
-          local msg = 'Playlist appended to mpv queue'
-          if skipped and skipped > 0 then msg = msg .. (' (' .. skipped .. ' skipped)') end
+          local msg = '已追加歌单到 mpv 队列'
+          if skipped and skipped > 0 then msg = msg .. ('（跳过 ' .. skipped .. ' 首）') end
           shared.show_info(msg)
-          reload_if_player_visible()
+          lc.cmd 'reload'
         end)
-        :catch(function(append_err)
-          shared.show_error(append_err)
-        end)
+        :catch(function(append_err) shared.show_error(append_err) end)
     end)
+  end)
+
+  return true
+end
+
+function M.toggle_song_like_entry()
+  local target = hovered_entry()
+  if not target then return false end
+
+  local song = nil
+  if target.kind == 'song' and target.song then
+    song = target.song
+  elseif target.mpv_meta and target.mpv_meta.id then
+    song = {
+      id = target.mpv_meta.id,
+      liked = target.mpv_meta.liked == true,
+    }
+  end
+
+  if not song or not song.id then return false end
+
+  local next_liked = song.liked ~= true
+  set_song_like_local(song.id, next_liked)
+
+  api.set_song_like(song.id, next_liked, function(_, err)
+    if err then
+      set_song_like_local(song.id, not next_liked)
+      shared.show_error(err)
+      return
+    end
+
+    shared.show_info(next_liked and '已加入我喜欢的音乐' or '已取消喜欢')
+    lc.cmd 'reload'
   end)
 
   return true

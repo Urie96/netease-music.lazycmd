@@ -9,11 +9,7 @@ local function section_entry(key, title, color, subtitle)
   return {
     key = key,
     kind = 'section',
-    display = lc.style.line {
-      color(title),
-      shared.dim '  ·  ',
-      shared.dim(subtitle),
-    },
+    display = lc.style.line { color(title) },
     preview = function(_, cb)
       cb(shared.preview_lines {
         lc.style.line { color(title) },
@@ -31,13 +27,13 @@ local function account_entries(cb)
     local lines = preview
     if err then
       lines = shared.preview_lines {
-        lc.style.line { shared.titlec 'Account' },
+        lc.style.line { shared.titlec '账号' },
         '',
-        shared.kv_line('Base URL', cfg.base_url or '-', 'accent'),
-        shared.kv_line('Cookie', api.get_cookie() and 'configured' or 'missing', api.get_cookie() and 'warm' or 'mag'),
+        shared.kv_line('服务地址', cfg.base_url or '-', 'accent'),
+        shared.kv_line('Cookie', api.get_cookie() and '已配置' or '未配置', api.get_cookie() and 'warm' or 'mag'),
         shared.kv_line('UID', api.get_uid() or cfg.uid or '-', 'accent'),
         '',
-        lc.style.line { shared.dim('Login status unavailable: ' .. tostring(err)) },
+        lc.style.line { shared.dim('登录状态不可用：' .. tostring(err)) },
       }
     end
 
@@ -46,12 +42,12 @@ local function account_entries(cb)
         key = 'status',
         kind = 'info',
         display = lc.style.line {
-          shared.titlec(data and data.profile and data.profile.nickname or 'Account status'),
+          shared.titlec(data and data.profile and data.profile.nickname or '账号状态'),
           shared.dim '  ·  ',
-          shared.dim(err and 'offline' or 'ready'),
+          shared.dim(err and '离线' or '就绪'),
         },
         keymap = {
-          [config.get().keymap.search] = { callback = actions.open_search_input, desc = 'search music' },
+          [config.get().keymap.search] = { callback = actions.open_search_input, desc = '搜索音乐' },
         },
         preview = function(_, done) done(lines) end,
       },
@@ -62,69 +58,68 @@ end
 local sections = {
   {
     key = 'account',
-    title = 'Account',
-    subtitle = 'login status, cookie and uid',
+    title = '账号',
+    subtitle = '登录状态、Cookie 和 UID',
     color = shared.accent,
   },
   {
     key = 'recommend',
-    title = 'Daily Playlists',
-    subtitle = 'recommend/resource, requires login',
+    title = '每日推荐歌单',
+    subtitle = 'recommend/resource，需要登录',
     color = shared.okc,
   },
   {
     key = 'daily',
-    title = 'Daily Songs',
-    subtitle = 'recommend/songs, requires login',
+    title = '每日推荐歌曲',
+    subtitle = 'recommend/songs，需要登录',
     color = shared.warm,
   },
   {
     key = 'my',
-    title = 'My Playlists',
-    subtitle = 'user/playlist, requires uid or login',
+    title = '我的歌单',
+    subtitle = 'user/playlist，需要 UID 或登录态',
     color = shared.mag,
   },
   {
+    key = 'liked',
+    title = '我喜欢的音乐',
+    subtitle = 'likelist + song/detail，需要登录',
+    color = shared.accent,
+  },
+  {
     key = 'personalized',
-    title = 'Personalized',
-    subtitle = 'public recommended playlists',
+    title = '推荐歌单',
+    subtitle = '公开推荐歌单',
     color = shared.okc,
   },
   {
     key = 'top',
-    title = 'Top Playlists',
-    subtitle = 'hot playlists from top/playlist',
+    title = '热门歌单',
+    subtitle = 'top/playlist 热门歌单',
     color = shared.warm,
   },
   {
     key = 'search',
-    title = 'Search',
-    subtitle = 'songs, albums, artists and playlists',
+    title = '搜索',
+    subtitle = '歌曲、专辑、歌手、歌单',
     color = shared.titlec,
   },
 }
 
 local function list_daily_songs(cb)
+  local playlist = require 'netease-music.playlist'
   api.list_daily_songs(function(songs, err)
     if err then
       cb(nil, err)
       return
     end
 
-    local keymap = config.get().keymap
     local entries = {}
     for _, song in ipairs(songs or {}) do
-      table.insert(entries, {
-        key = tostring(song.id),
-        kind = 'song',
-        song = song,
-        display = shared.format_song_display(song),
-        keymap = {
-          [keymap.play_now] = { callback = actions.play_song_entry, desc = 'play now' },
-          [keymap.append_to_player] = { callback = actions.append_song_entry, desc = 'append to player' },
-        },
-        preview = function(_, done) shared.song_preview(song, done) end,
-      })
+        table.insert(entries, playlist.build_song_entry(song, {
+          id = 'daily-songs',
+        name = '每日推荐歌曲',
+      }))
     end
     cb(entries)
   end)
@@ -148,6 +143,11 @@ function M.list(path, cb)
 
   if section == 'daily' then
     list_daily_songs(cb)
+    return
+  end
+
+  if section == 'liked' then
+    require('netease-music.playlist').list_liked_songs_entries(cb)
     return
   end
 
