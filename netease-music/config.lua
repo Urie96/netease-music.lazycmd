@@ -2,8 +2,6 @@ local M = {}
 
 local cfg = {
   base_url = os.getenv 'NETEASE_MUSIC_API_URL' or 'http://127.0.0.1:3000',
-  cookie = os.getenv 'NETEASE_MUSIC_COOKIE',
-  uid = os.getenv 'NETEASE_MUSIC_UID',
   quality = 'exhigh',
   personalized_limit = 30,
   top_playlist_limit = 50,
@@ -32,8 +30,6 @@ end
 local function normalize(next_cfg)
   local out = next_cfg
   out.base_url = trim(out.base_url)
-  out.cookie = trim(out.cookie)
-  out.uid = trim(out.uid)
   out.quality = trim(out.quality) or 'exhigh'
 
   if out.base_url then out.base_url = out.base_url:gsub('/+$', '') end

@@ -17,8 +17,6 @@ local function config_entries(err)
           lc.style.line { shared.titlec '网易云音乐插件配置' },
           '',
           shared.kv_line('base_url', 'NeteaseCloudMusicApi 服务地址', 'accent'),
-          shared.kv_line('cookie', '可选，用于每日推荐和私人数据', 'warm'),
-          shared.kv_line('uid', '可选，用于用户歌单', 'accent'),
           '',
           lc.style.line { shared.dim(tostring(err)) },
         })

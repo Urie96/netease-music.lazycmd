@@ -5,7 +5,7 @@
 ## 功能
 
 - 一级目录显示：
-  - `账号`：查看 `base_url` / `cookie` / `uid` 配置和登录状态
+  - `账号`：查看 `base_url` / `cookie` / `uid` 配置和登录状态，并支持短信验证码登录、二维码登录、手动输入 Cookie、清除本地凭证
   - `每日推荐歌单`：每日推荐歌单，需要登录
   - `每日推荐歌曲`：每日推荐歌曲，需要登录
   - `我的歌单`：用户歌单，需要 `uid` 或可用登录态
@@ -38,8 +38,6 @@
   config = function()
     require('netease-music').setup {
       base_url = os.getenv 'NETEASE_MUSIC_API_URL',
-      cookie = os.getenv 'NETEASE_MUSIC_COOKIE',
-      uid = os.getenv 'NETEASE_MUSIC_UID',
       quality = 'exhigh',
 
       personalized_limit = 30,
@@ -65,10 +63,26 @@
 ## 环境变量
 
 - `NETEASE_MUSIC_API_URL`
-- `NETEASE_MUSIC_COOKIE`
-- `NETEASE_MUSIC_UID`
 
-`cookie` 和 `uid` 都是可选的，但登录相关页面需要它们之一。插件会优先使用 `setup()` 传入的值；如果接口返回新的 `cookie` 或 `uid`，也会缓存到 lazycmd 的本地 cache 中。
+插件只接受 `base_url` 这类非敏感配置。`cookie` 不再通过 `setup()` 或环境变量传入；如果你在 `账号` 页面完成短信验证码登录、二维码登录，或手动录入 Cookie，插件会把 `cookie`、`uid` 和最近一次使用的手机号都保存到 `lc.secrets`。
+
+## 登录
+
+在 `账号` 页面里，当前支持三种登录相关流程：
+
+- `短信验证码登录`
+  - 先输入手机号，插件调用 `/captcha/sent`
+  - 再输入验证码，插件调用 `/login/cellphone`
+  - 登录成功后会保存返回的 `cookie`
+- `二维码登录`
+  - 插件调用 `/login/qr/key` 和 `/login/qr/create`
+  - 将接口返回的二维码 base64 图片解码后写入临时 PNG 文件，并用系统默认应用打开
+  - 后台轮询 `/login/qr/check`，扫码确认成功后自动保存 `cookie`
+- `手动输入 Cookie`
+  - 适合从浏览器复制完整 Cookie，或只复制 `MUSIC_U=...`
+  - 保存后插件会立刻调用 `/login/status` 校验登录态并同步 `uid`
+
+登录相关信息通过 `lc.secrets` 保存，包括 `cookie`、`uid` 和最近一次使用的手机号。这样多台机器如果共享同一份 secrets，就可以复用登录态；后续即使 Cookie 失效，插件仍可尝试用保存下来的 `uid` 展示用户歌单。
 
 ## 依赖
 
@@ -80,6 +94,11 @@
 当前实现使用这些 API：
 
 - `/login/status`
+- `/captcha/sent`
+- `/login/cellphone`
+- `/login/qr/key`
+- `/login/qr/create`
+- `/login/qr/check`
 - `/personalized`
 - `/top/playlist`
 - `/user/playlist`
@@ -97,6 +116,6 @@
 
 ## 说明
 
-- 这个插件目前聚焦“浏览 + 搜索 + 播放”主流程；已支持喜欢/取消喜欢，但还没有实现二维码登录和歌单编辑等写操作
+- 这个插件目前聚焦“浏览 + 搜索 + 播放”主流程；已支持喜欢/取消喜欢、短信验证码登录、二维码登录、手动 Cookie 登录，但还没有实现歌单编辑等写操作
 - `每日推荐歌单`、`每日推荐歌曲`、`我的歌单` 是否可用，取决于接口服务端是否接受当前 `cookie`
 - API 响应会同时走内存缓存和 `lc.cache` 持久化缓存，TTL 按接口性质区分：登录态 60 秒，公开推荐/热门歌单 12 小时，我的歌单 3 小时，每日推荐 12 小时，歌单详情 3 小时，搜索 1 天，播放 URL 30 分钟，歌词 30 天

@@ -194,11 +194,12 @@ function M.account_preview(data, cfg)
     '',
     M.kv_line('服务地址', cfg.base_url or '-', 'accent'),
     M.kv_line('Cookie', api.get_cookie() and '已配置' or '未配置', api.get_cookie() and 'warm' or 'mag'),
-    M.kv_line('UID', api.get_uid() or cfg.uid or '-', 'accent'),
+    M.kv_line('手机号', api.get_phone() or '-', 'accent'),
+    M.kv_line('UID', api.get_uid() or '-', 'accent'),
     M.kv_line('昵称', profile.nickname or '-', 'warm'),
     M.kv_line('用户 ID', tostring(profile.userId or account.id or '-'), 'accent'),
     '',
-    lc.style.line { M.dim '请在 setup() 中配置 cookie/uid，以使用我的歌单和每日推荐。' },
+    lc.style.line { M.dim '可在此页直接进行短信验证码登录，或手动录入 Cookie。敏感凭证会保存在 lc.secrets。' },
   }
 end
 

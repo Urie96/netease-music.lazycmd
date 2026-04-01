@@ -160,6 +160,172 @@ function M.open_search_input()
   }
 end
 
+local function reload_account_page()
+  lc.cmd 'reload'
+end
+
+local function qr_image_path(token)
+  return '/tmp/lazycmd-netease-music-qr-' .. tostring(token or 'latest') .. '.png'
+end
+
+local function open_qr_in_browser(session)
+  local qr_img = session and session.img or nil
+  if not qr_img or qr_img == '' then error '二维码图片缺失' end
+
+  local encoded = tostring(qr_img)
+  encoded = encoded:gsub('^data:image/[^;]+;base64,', '')
+
+  local image_path = qr_image_path(session and session.token)
+  local decoded = lc.base64.decode(encoded)
+  local ok, err = lc.fs.write_file_sync(image_path, decoded)
+  if not ok then error('写入二维码图片失败: ' .. tostring(err)) end
+  lc.system.open(image_path)
+  return image_path
+end
+
+local function poll_qr_login(token)
+  local current = api.get_qr_login_state()
+  if current.token ~= token then return end
+
+  local prev_status = current.status
+  local prev_code = current.code
+  local prev_message = current.message
+  api.poll_qr_login(token, function(state, err, data)
+    if err then
+      shared.show_error(err)
+      reload_account_page()
+      return
+    end
+
+    if not state or state.token ~= token then return end
+
+    if state.status == 'success' then
+      local profile = data and data.profile or {}
+      local nickname = profile.nickname and ('：' .. tostring(profile.nickname)) or ''
+      shared.show_info('二维码登录成功' .. nickname)
+      reload_account_page()
+      return
+    end
+
+    if state.status == 'expired' then
+      shared.show_error(state.message or '二维码已过期')
+      reload_account_page()
+      return
+    end
+
+    if state.code ~= prev_code or state.status ~= prev_status or state.message ~= prev_message then
+      reload_account_page()
+    end
+    lc.defer_fn(function() poll_qr_login(token) end, 1500)
+  end)
+end
+
+function M.open_cookie_input()
+  lc.input {
+    prompt = '手动输入网易云 Cookie',
+    placeholder = '粘贴完整 cookie，或至少包含 MUSIC_U=...',
+    value = api.get_cookie() or '',
+    on_submit = function(input)
+      local cookie = tostring(input or ''):trim()
+      if cookie == '' then
+        shared.show_error 'Cookie 不能为空'
+        return
+      end
+
+      api.save_cookie(cookie, function(data, err)
+        if err then
+          shared.show_error('Cookie 校验失败：' .. tostring(err))
+          return
+        end
+
+        local profile = data and data.profile or {}
+        local nickname = profile.nickname and ('：' .. tostring(profile.nickname)) or ''
+        shared.show_info('Cookie 已保存' .. nickname)
+        reload_account_page()
+      end)
+    end,
+  }
+end
+
+function M.clear_saved_auth()
+  lc.confirm {
+    prompt = '清除当前保存的 Cookie / UID / 手机号？',
+    on_confirm = function()
+      api.clear_saved_auth()
+      shared.show_info '已清除本地保存的登录凭证'
+      reload_account_page()
+    end,
+  }
+end
+
+function M.open_sms_login()
+  lc.input {
+    prompt = '发送短信验证码',
+    placeholder = '输入 11 位手机号，默认 +86',
+    value = api.get_phone() or '',
+    on_submit = function(phone_input)
+      local phone = tostring(phone_input or ''):trim()
+      if phone == '' then
+        shared.show_error '手机号不能为空'
+        return
+      end
+
+      api.send_login_captcha(phone, function(_, send_err)
+        if send_err then
+          shared.show_error(send_err)
+          return
+        end
+
+        shared.show_info '验证码已发送'
+        lc.input {
+          prompt = '输入短信验证码',
+          placeholder = '请输入收到的 4-6 位验证码',
+          on_submit = function(code_input)
+            local code = tostring(code_input or ''):trim()
+            if code == '' then
+              shared.show_error '验证码不能为空'
+              return
+            end
+
+            api.login_with_captcha(phone, code, function(data, login_err)
+              if login_err then
+                shared.show_error(login_err)
+                return
+              end
+
+              local profile = data and data.profile or {}
+              local nickname = profile.nickname and ('：' .. tostring(profile.nickname)) or ''
+              shared.show_info('短信登录成功' .. nickname)
+              reload_account_page()
+            end)
+          end,
+        }
+      end)
+    end,
+  }
+end
+
+function M.open_qr_login()
+  api.start_qr_login(function(session, err)
+    if err then
+      shared.show_error(err)
+      reload_account_page()
+      return
+    end
+
+    local ok, open_err = pcall(open_qr_in_browser, session)
+    if not ok then
+      shared.show_error('打开二维码失败：' .. tostring(open_err))
+      reload_account_page()
+      return
+    end
+
+    shared.show_info '已打开二维码图片，请在系统打开的应用中扫码'
+    reload_account_page()
+    lc.defer_fn(function() poll_qr_login(session.token) end, 1200)
+  end)
+end
+
 function M.play_song_entry()
   local target = hovered_entry()
   if not target or target.kind ~= 'song' or not target.song then
