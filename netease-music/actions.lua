@@ -4,7 +4,7 @@ local api = require 'netease-music.api'
 local config = require 'netease-music.config'
 local shared = require 'netease-music.shared'
 
-local function hovered_entry() return lc.api.page_get_hovered() end
+local function hovered_entry() return lc.api.get_hovered() end
 
 local function get_mpv()
   local ok, mod = pcall(require, 'mpv')
@@ -74,7 +74,7 @@ local function build_mpv_track(song, url_info)
 end
 
 local function set_song_like_local(song_id, liked)
-  local entries = lc.api.page_get_entries() or {}
+  local entries = lc.api.get_entries() or {}
   local path = lc.api.get_current_path() or {}
   local is_liked_page = path[1] == 'netease-music' and path[2] == 'liked'
   local next_entries = {}
@@ -111,10 +111,11 @@ local function set_song_like_local(song_id, liked)
     }
   end
 
-  lc.api.page_set_entries(next_entries)
-  local hovered = lc.api.page_get_hovered()
+  lc.api.set_entries(nil, next_entries)
+  local hovered = lc.api.get_hovered()
   if hovered and type(hovered.preview) == 'function' then
-    hovered:preview(function(preview) lc.api.page_set_preview(preview) end)
+    local hovered_path = lc.api.get_hovered_path()
+    hovered:preview(function(preview) lc.api.set_preview(hovered_path, preview) end)
   end
 end
 

@@ -204,7 +204,7 @@ function M.account_preview(data, cfg)
 end
 
 function M.current_song_entries()
-  local entries = lc.api.page_get_entries() or {}
+  local entries = lc.api.get_entries() or {}
   local songs = {}
   for _, entry in ipairs(entries) do
     if entry.kind == 'song' and entry.song then table.insert(songs, entry.song) end
