@@ -17,7 +17,7 @@ local function player_preview(entry)
   local meta = entry.mpv_meta or {}
   local item = entry.player_item or {}
   local player = entry.player or {}
-  local url = meta.url or item.filename or item.url or '-'
+  local url = meta.resolved_url or meta.url or item.filename or item.url or '-'
 
   return shared.preview_lines {
     lc.style.line { shared.okc 'mpv 队列' },
@@ -37,14 +37,25 @@ local function build_mpv_track(song, url_info)
   return {
     id = song.id,
     key = tostring(song.id),
-    url = url_info.url,
     title = shared.song_title(song),
     artist = shared.song_artists(song),
     album = shared.song_album(song),
     duration = song.dt or song.duration,
     liked = song.liked == true,
-    url = url_info.url,
     source = 'netease-music',
+    get_play_url = function(track, cb)
+      api.get_song_urls({ song.id }, function(urls, err)
+        if err then
+          cb(nil, err)
+          return
+        end
+
+        local item = urls and urls[tostring(song.id)] or nil
+        local resolved = item and item.url or nil
+        if resolved and resolved ~= '' then track.resolved_url = resolved end
+        cb(resolved, nil)
+      end)
+    end,
     display = function(item, player, meta)
       local current = item.current or item.playing
       local marker = shared.dim '  '
