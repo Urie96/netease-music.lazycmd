@@ -24,6 +24,35 @@ local function qr_image_path(token)
   return '/tmp/lazycmd-netease-music-qr-' .. tostring(token or 'latest') .. '.png'
 end
 
+local function qr_preview_widget(qr)
+  local image_path = qr and qr.img and qr_image_path(qr.token) or nil
+  local text = shared.preview_lines {
+    lc.style.line { shared.accent '二维码登录' },
+    '',
+    shared.kv_line('当前状态', qr and (qr.message or qr.status) or '-', 'accent'),
+    shared.kv_line('状态码', qr and qr.code and tostring(qr.code) or '-', 'warm'),
+    shared.kv_line('二维码图片', qr and qr.img and '已生成' or '未生成', qr and qr.img and 'warm' or 'mag'),
+    shared.kv_line('图片位置', image_path or '-', 'accent'),
+    shared.kv_line('二维码内容', qr and qr.url and '已生成' or '未生成', qr and qr.url and 'warm' or 'mag'),
+    qr and qr.url and qr.url ~= '' and '' or nil,
+    qr and qr.url and qr.url ~= '' and lc.style.line { shared.warm '二维码地址' } or nil,
+    qr and qr.url and qr.url ~= '' and lc.style.line { shared.titlec(qr.url) } or nil,
+    '',
+    lc.style.line { shared.dim '按回车生成新的二维码，并直接在预览区展示；成功扫码后自动保存 cookie。' },
+  }
+
+  if image_path then
+    return {
+      text,
+      '',
+      lc.style.line { shared.warm '二维码图片预览（原生图片）' },
+      lc.style.image(image_path),
+    }
+  end
+
+  return text
+end
+
 local function account_entries(cb)
   api.get_login_status(function(data, err)
     local cfg = config.get()
@@ -93,17 +122,7 @@ local function account_entries(cb)
         },
         preview = function(_, done)
           local qr = api.get_qr_login_state()
-          done(shared.preview_lines {
-            lc.style.line { shared.accent '二维码登录' },
-            '',
-            shared.kv_line('当前状态', qr.message or qr.status or '-', 'accent'),
-            shared.kv_line('状态码', qr.code and tostring(qr.code) or '-', 'warm'),
-            shared.kv_line('二维码图片', qr.img and '已生成' or '未生成', qr.img and 'warm' or 'mag'),
-            shared.kv_line('图片位置', qr.img and qr_image_path(qr.token) or '-', 'accent'),
-            shared.kv_line('二维码内容', qr.url and '已生成' or '未生成', qr.url and 'warm' or 'mag'),
-            '',
-            lc.style.line { shared.dim '会生成新的二维码图片并尝试用系统默认应用打开；成功扫码后自动保存 cookie。' },
-          })
+          done(qr_preview_widget(qr))
         end,
         keymap = action_keymap(actions.open_qr_login, '二维码登录'),
       },

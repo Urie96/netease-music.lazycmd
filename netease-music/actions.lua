@@ -180,7 +180,7 @@ local function qr_image_path(token)
   return '/tmp/lazycmd-netease-music-qr-' .. tostring(token or 'latest') .. '.png'
 end
 
-local function open_qr_in_browser(session)
+local function write_qr_image(session)
   local qr_img = session and session.img or nil
   if not qr_img or qr_img == '' then error '二维码图片缺失' end
 
@@ -191,7 +191,6 @@ local function open_qr_in_browser(session)
   local decoded = lc.base64.decode(encoded)
   local ok, err = lc.fs.write_file_sync(image_path, decoded)
   if not ok then error('写入二维码图片失败: ' .. tostring(err)) end
-  lc.system.open(image_path)
   return image_path
 end
 
@@ -325,14 +324,14 @@ function M.open_qr_login()
       return
     end
 
-    local ok, open_err = pcall(open_qr_in_browser, session)
+    local ok, write_err = pcall(write_qr_image, session)
     if not ok then
-      shared.show_error('打开二维码失败：' .. tostring(open_err))
+      shared.show_error('生成二维码图片失败：' .. tostring(write_err))
       reload_account_page()
       return
     end
 
-    shared.show_info '已打开二维码图片，请在系统打开的应用中扫码'
+    shared.show_info '二维码已生成，请直接在预览区扫码'
     reload_account_page()
     lc.defer_fn(function() poll_qr_login(session.token) end, 1200)
   end)
