@@ -2,13 +2,13 @@ local M = {}
 
 local api = require 'netease-music.api'
 
-function M.dim(text) return lc.style.span(tostring(text or '')):fg 'blue' end
-function M.accent(text) return lc.style.span(tostring(text or '')):fg 'cyan' end
-function M.warm(text) return lc.style.span(tostring(text or '')):fg 'yellow' end
-function M.okc(text) return lc.style.span(tostring(text or '')):fg 'green' end
-function M.mag(text) return lc.style.span(tostring(text or '')):fg 'magenta' end
-function M.titlec(text) return lc.style.span(tostring(text or '')):fg 'white' end
-function M.liked_icon() return lc.style.span(' '):fg 'red' end
+function M.dim(text) return deck.style.span(tostring(text or '')):fg 'blue' end
+function M.accent(text) return deck.style.span(tostring(text or '')):fg 'cyan' end
+function M.warm(text) return deck.style.span(tostring(text or '')):fg 'yellow' end
+function M.okc(text) return deck.style.span(tostring(text or '')):fg 'green' end
+function M.mag(text) return deck.style.span(tostring(text or '')):fg 'magenta' end
+function M.titlec(text) return deck.style.span(tostring(text or '')):fg 'white' end
+function M.liked_icon() return deck.style.span(' '):fg 'red' end
 
 local function aligned_line(line) return { line = line, align = true } end
 
@@ -22,19 +22,19 @@ function M.preview_lines(lines)
       item = line.line
       should_align = line.align == true
     elseif type(line) == 'string' or type(line) == 'number' or type(line) == 'boolean' or line == nil then
-      item = lc.style.line { lc.style.span(tostring(line or '')) }
+      item = deck.style.line { deck.style.span(tostring(line or '')) }
     end
 
     table.insert(out, item)
     if should_align then table.insert(aligned, item) end
   end
 
-  if #aligned > 0 then lc.style.align_columns(aligned) end
-  return lc.style.text(out)
+  if #aligned > 0 then deck.style.align_columns(aligned) end
+  return deck.style.text(out)
 end
 
 function M.kv_line(label, value, label_color)
-  local label_span = lc.style.span(tostring(label or ''))
+  local label_span = deck.style.span(tostring(label or ''))
   if label_color == 'accent' then
     label_span = label_span:fg 'cyan'
   elseif label_color == 'warm' then
@@ -45,7 +45,7 @@ function M.kv_line(label, value, label_color)
     label_span = label_span:fg 'blue'
   end
 
-  return aligned_line(lc.style.line {
+  return aligned_line(deck.style.line {
     label_span,
     M.dim ': ',
     M.titlec(value or '-'),
@@ -53,16 +53,16 @@ function M.kv_line(label, value, label_color)
 end
 
 function M.show_error(err)
-  lc.notify(lc.style.line {
-    lc.style.span('网易云音乐：'):fg 'red',
-    lc.style.span(tostring(err)):fg 'red',
+  deck.notify(deck.style.line {
+    deck.style.span('网易云音乐：'):fg 'red',
+    deck.style.span(tostring(err)):fg 'red',
   })
 end
 
 function M.show_info(msg)
-  lc.notify(lc.style.line {
-    lc.style.span('网易云音乐：'):fg 'cyan',
-    lc.style.span(tostring(msg)):fg 'white',
+  deck.notify(deck.style.line {
+    deck.style.span('网易云音乐：'):fg 'cyan',
+    deck.style.span(tostring(msg)):fg 'white',
   })
 end
 
@@ -105,7 +105,7 @@ function M.playlist_creator_name(playlist)
 end
 
 function M.format_song_display(song)
-  return lc.style.line {
+  return deck.style.line {
     song.liked == true and M.liked_icon() or M.dim '  ',
     M.titlec(M.song_title(song)),
     M.dim '  [',
@@ -115,11 +115,11 @@ function M.format_song_display(song)
 end
 
 function M.format_playlist_display(playlist)
-  return lc.style.line { M.warm(playlist.name or playlist.id or '歌单') }
+  return deck.style.line { M.warm(playlist.name or playlist.id or '歌单') }
 end
 
 function M.format_artist_display(artist)
-  return lc.style.line {
+  return deck.style.line {
     M.mag(artist.name or artist.id or '歌手'),
     artist.alias and #artist.alias > 0 and M.dim('  ·  ' .. table.concat(artist.alias, ' / ')) or '',
   }
@@ -127,7 +127,7 @@ end
 
 function M.format_album_display(album)
   local artist = M.song_artists { artists = album.artists or album.ar or {} }
-  return lc.style.line {
+  return deck.style.line {
     M.warm(album.name or album.id or '专辑'),
     M.dim '  ·  ',
     M.accent(artist),
@@ -150,7 +150,7 @@ function M.song_preview(song, cb)
     end
 
     local lines = {
-      lc.style.line { M.titlec(M.song_title(song)) },
+      deck.style.line { M.titlec(M.song_title(song)) },
       '',
       M.kv_line('歌手', M.song_artists(song), 'accent'),
       M.kv_line('专辑', M.song_album(song), 'warm'),
@@ -161,10 +161,10 @@ function M.song_preview(song, cb)
 
     if err then
       table.insert(lines, '')
-      table.insert(lines, lc.style.line { M.dim('歌词不可用：' .. tostring(err)) })
+      table.insert(lines, deck.style.line { M.dim('歌词不可用：' .. tostring(err)) })
     elseif #lyric_lines > 0 then
       table.insert(lines, '')
-      table.insert(lines, lc.style.line { M.accent '歌词' })
+      table.insert(lines, deck.style.line { M.accent '歌词' })
       for _, line in ipairs(lyric_lines) do
         table.insert(lines, line)
       end
@@ -176,13 +176,13 @@ end
 
 function M.playlist_preview(playlist)
   return M.preview_lines {
-    lc.style.line { M.warm(playlist.name or '歌单') },
+    deck.style.line { M.warm(playlist.name or '歌单') },
     '',
     M.kv_line('歌曲数', tostring(playlist.trackCount or playlist.songCount or 0) .. ' 首', 'accent'),
     M.kv_line('播放次数', tostring(playlist.playCount or '-'), 'warm'),
     M.kv_line('收藏数', tostring(playlist.subscribedCount or '-'), 'mag'),
     '',
-    lc.style.line { M.dim(playlist.description or '暂无简介') },
+    deck.style.line { M.dim(playlist.description or '暂无简介') },
   }
 end
 
@@ -190,7 +190,7 @@ function M.account_preview(data, cfg)
   local profile = data and data.profile or {}
   local account = data and data.account or {}
   return M.preview_lines {
-    lc.style.line { M.titlec '账号' },
+    deck.style.line { M.titlec '账号' },
     '',
     M.kv_line('服务地址', cfg.base_url or '-', 'accent'),
     M.kv_line('Cookie', api.get_cookie() and '已配置' or '未配置', api.get_cookie() and 'warm' or 'mag'),
@@ -199,12 +199,12 @@ function M.account_preview(data, cfg)
     M.kv_line('昵称', profile.nickname or '-', 'warm'),
     M.kv_line('用户 ID', tostring(profile.userId or account.id or '-'), 'accent'),
     '',
-    lc.style.line { M.dim '可在此页直接进行短信验证码登录，或手动录入 Cookie。敏感凭证会保存在 lc.secrets。' },
+    deck.style.line { M.dim '可在此页直接进行短信验证码登录，或手动录入 Cookie。敏感凭证会保存在 deck.secrets。' },
   }
 end
 
 function M.current_song_entries()
-  local entries = lc.api.get_entries() or {}
+  local entries = deck.api.get_entries() or {}
   local songs = {}
   for _, entry in ipairs(entries) do
     if entry.kind == 'song' and entry.song then table.insert(songs, entry.song) end

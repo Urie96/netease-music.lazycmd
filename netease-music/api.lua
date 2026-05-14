@@ -45,7 +45,7 @@ local cache_ttl = {
 local function encode_query(params)
   local chunks = {}
   for key, value in pairs(params or {}) do
-    if value ~= nil and value ~= '' then table.insert(chunks, lc.url.encode(key) .. '=' .. lc.url.encode(value)) end
+    if value ~= nil and value ~= '' then table.insert(chunks, deck.url.encode(key) .. '=' .. deck.url.encode(value)) end
   end
   table.sort(chunks)
   return table.concat(chunks, '&')
@@ -72,12 +72,12 @@ local function ensure_cache_state()
   state.cache_prefix = 'netease-music:' .. next_key .. ':'
   state.cache_version = 0
   state.cache = {}
-  state.cookie = lc.secrets.get(SECRET_NAMESPACE, 'cookie') or lc.cache.get('netease-music', 'cookie')
-  state.uid = lc.secrets.get(SECRET_NAMESPACE, 'uid')
-  state.phone = lc.secrets.get(SECRET_NAMESPACE, 'phone')
+  state.cookie = deck.secrets.get(SECRET_NAMESPACE, 'cookie') or deck.cache.get('netease-music', 'cookie')
+  state.uid = deck.secrets.get(SECRET_NAMESPACE, 'uid')
+  state.phone = deck.secrets.get(SECRET_NAMESPACE, 'phone')
 
-  if state.cookie and lc.secrets.get(SECRET_NAMESPACE, 'cookie') ~= state.cookie then
-    lc.secrets.set(SECRET_NAMESPACE, 'cookie', state.cookie)
+  if state.cookie and deck.secrets.get(SECRET_NAMESPACE, 'cookie') ~= state.cookie then
+    deck.secrets.set(SECRET_NAMESPACE, 'cookie', state.cookie)
   end
   return cfg
 end
@@ -107,8 +107,8 @@ local function set_cookie(cookie)
   local text = cookie and tostring(cookie):match '^%s*(.-)%s*$' or nil
   if not text or text == '' then return end
   state.cookie = text
-  lc.secrets.set(SECRET_NAMESPACE, 'cookie', text)
-  lc.cache.delete('netease-music', 'cookie')
+  deck.secrets.set(SECRET_NAMESPACE, 'cookie', text)
+  deck.cache.delete('netease-music', 'cookie')
   invalidate_auth_caches()
 end
 
@@ -116,14 +116,14 @@ local function set_uid(uid)
   local text = uid and tostring(uid):match '^%s*(.-)%s*$' or nil
   if not text or text == '' then return end
   state.uid = text
-  lc.secrets.set(SECRET_NAMESPACE, 'uid', text)
+  deck.secrets.set(SECRET_NAMESPACE, 'uid', text)
 end
 
 local function set_phone(phone)
   local text = phone and tostring(phone):match '^%s*(.-)%s*$' or nil
   if not text or text == '' then return end
   state.phone = text
-  lc.secrets.set(SECRET_NAMESPACE, 'phone', text)
+  deck.secrets.set(SECRET_NAMESPACE, 'phone', text)
 end
 
 local function make_cache_key(name, params)
@@ -135,7 +135,7 @@ local function cache_get(name, params)
   local cached = state.cache[key]
   if cached ~= nil then return cached end
 
-  local persisted = lc.cache.get(CACHE_NAMESPACE, key)
+  local persisted = deck.cache.get(CACHE_NAMESPACE, key)
   if persisted ~= nil then
     state.cache[key] = persisted
     return persisted
@@ -147,16 +147,16 @@ end
 local function cache_set(key, value, ttl)
   state.cache[key] = value
   if ttl and ttl > 0 then
-    lc.cache.set(CACHE_NAMESPACE, key, value, { ttl = ttl })
+    deck.cache.set(CACHE_NAMESPACE, key, value, { ttl = ttl })
     return
   end
-  lc.cache.set(CACHE_NAMESPACE, key, value)
+  deck.cache.set(CACHE_NAMESPACE, key, value)
 end
 
 local function cache_delete_by_name(name, params)
   local key = make_cache_key(name, params)
   state.cache[key] = nil
-  lc.cache.delete(CACHE_NAMESPACE, key)
+  deck.cache.delete(CACHE_NAMESPACE, key)
 end
 
 local function get_cached_json(name, params, ttl, loader, cb)
@@ -189,7 +189,7 @@ local function request_json(endpoint, params, opt, cb)
   end
   opt = opt or {}
 
-  local query = lc.tbl_extend('force', {}, params or {})
+  local query = deck.tbl_extend('force', {}, params or {})
   if not opt.no_cookie then
     local cookie = current_cookie()
     if cookie and cookie ~= '' then query.cookie = cookie end
@@ -199,13 +199,13 @@ local function request_json(endpoint, params, opt, cb)
   local query_string = encode_query(query)
   if query_string ~= '' then url = url .. '?' .. query_string end
 
-  lc.http.get(url, function(response)
+  deck.http.get(url, function(response)
     if not response.success then
       cb(nil, response.error or ('HTTP ' .. tostring(response.status)))
       return
     end
 
-    local decode_ok, decoded = pcall(lc.json.decode, response.body or '')
+    local decode_ok, decoded = pcall(deck.json.decode, response.body or '')
     if not decode_ok then
       cb(nil, '解析网易云接口响应失败')
       return
@@ -353,7 +353,7 @@ end
 
 local function update_qr_login_state(next_state)
   local current = state.qr_login or {}
-  state.qr_login = lc.tbl_extend('force', {}, current, next_state or {})
+  state.qr_login = deck.tbl_extend('force', {}, current, next_state or {})
 end
 
 local function extract_qr_key(payload)
@@ -558,13 +558,13 @@ end
 function M.clear_saved_auth()
   ensure_cache_state()
   state.cookie = nil
-  lc.secrets.delete(SECRET_NAMESPACE, 'cookie')
+  deck.secrets.delete(SECRET_NAMESPACE, 'cookie')
 
   state.phone = nil
-  lc.secrets.delete(SECRET_NAMESPACE, 'phone')
+  deck.secrets.delete(SECRET_NAMESPACE, 'phone')
 
   state.uid = nil
-  lc.secrets.delete(SECRET_NAMESPACE, 'uid')
+  deck.secrets.delete(SECRET_NAMESPACE, 'uid')
 
   invalidate_auth_caches()
 end
@@ -702,7 +702,7 @@ local function get_song_like_cache(song_id)
   local params = { id = tostring(song_id) }
   local key = make_cache_key('like-song', params)
   local cached = state.cache[key]
-  if cached == nil then cached = lc.cache.get(CACHE_NAMESPACE, key) end
+  if cached == nil then cached = deck.cache.get(CACHE_NAMESPACE, key) end
   if cached ~= nil then state.cache[key] = cached end
   return cached, key
 end

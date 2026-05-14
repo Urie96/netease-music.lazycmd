@@ -1,34 +1,48 @@
 local M = {}
 
-local actions = require 'netease-music.actions'
 local api = require 'netease-music.api'
 local config = require 'netease-music.config'
-local root = require 'netease-music.root'
+local provider = require 'netease-music.provider'
 local shared = require 'netease-music.shared'
+
+local browser = nil
 
 local function config_entries(err)
   return {
     {
       key = 'configure',
       kind = 'info',
-      display = lc.style.line { lc.style.span('请通过 setup() 配置网易云音乐插件'):fg 'yellow' },
+      display = deck.style.line { deck.style.span('请通过 setup() 配置网易云音乐插件'):fg 'yellow' },
       preview = function(_, cb)
         cb(shared.preview_lines {
-          lc.style.line { shared.titlec '网易云音乐插件配置' },
+          deck.style.line { shared.titlec '网易云音乐插件配置' },
           '',
           shared.kv_line('base_url', 'NeteaseCloudMusicApi 服务地址', 'accent'),
           '',
-          lc.style.line { shared.dim(tostring(err)) },
+          deck.style.line { shared.dim(tostring(err)) },
         })
       end,
     },
   }
 end
 
+local function ensure_browser()
+  if browser then return browser end
+
+  local music, load_err = deck.plugin.load 'music'
+  if not music then error('failed to load music plugin: ' .. tostring(load_err)) end
+
+  browser = music.new(provider, {
+    root = 'netease-music',
+  })
+  return browser
+end
+
 function M.setup(opt)
   config.setup(opt)
-  local _, setup_err = lc.plugin.load 'mpv'
-  if setup_err then lc.log('warn', 'failed to setup mpv plugin from netease-music: {}', tostring(setup_err)) end
+  browser = nil
+  local _, setup_err = deck.plugin.load 'music'
+  if setup_err then deck.log('warn', 'failed to setup music plugin from netease-music: {}', tostring(setup_err)) end
 end
 
 function M.list(path, cb)
@@ -38,14 +52,13 @@ function M.list(path, cb)
     return
   end
 
-  root.list(path, function(entries, list_err)
-    if list_err then
-      shared.show_error(list_err)
-      cb {}
-      return
-    end
-    cb(entries)
-  end)
+  local get_ok, b_or_err = pcall(ensure_browser)
+  if not get_ok then
+    cb(config_entries(b_or_err))
+    return
+  end
+
+  b_or_err:list(path, cb)
 end
 
 function M.preview(entry, cb)
@@ -59,9 +72,12 @@ function M.preview(entry, cb)
     return
   end
 
-  cb(shared.preview_lines {
-    lc.style.line { shared.titlec(entry.key or '网易云音乐') },
-  })
+  local get_ok, b_or_err = pcall(ensure_browser)
+  if get_ok then
+    b_or_err:preview(entry, cb)
+  else
+    cb(shared.preview_lines { tostring(b_or_err) })
+  end
 end
 
 return M

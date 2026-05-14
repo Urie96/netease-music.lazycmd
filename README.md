@@ -1,25 +1,23 @@
-# netease-music.lazycmd
+# netease-music.lazydeck
 
-网易云音乐插件，基于 `NeteaseCloudMusicApi` 提供浏览、搜索、歌词预览，以及把歌曲/歌单投递到 `mpv.lazycmd` 队列播放。
+网易云音乐 provider 插件，基于 `NeteaseCloudMusicApi` 提供标准化音乐数据；通用浏览、预览、搜索、推荐和播放队列由 `music.lazydeck` 提供。
 
 ## 功能
 
-- 一级目录显示：
-  - `账号`：查看 `base_url` / `cookie` / `uid` 配置和登录状态，并支持短信验证码登录、二维码登录、手动输入 Cookie、清除本地凭证
-  - `每日推荐歌单`：每日推荐歌单，需要登录
-  - `每日推荐歌曲`：每日推荐歌曲，需要登录
-  - `我的歌单`：用户歌单，需要 `uid` 或可用登录态
-  - `我喜欢的音乐`：我喜欢的歌曲列表，需要登录
-  - `推荐歌单`：推荐歌单
-  - `热门歌单`：热门歌单
-  - `搜索`：搜索歌曲、专辑、歌手、歌单
+- 一级目录由 `music.lazydeck` 根据 provider 能力自动生成：
+  - `Now Playing`：当前播放队列
+  - `Playlists`：我的歌单，需要 UID 或可用登录态
+  - `Recommendations`：推荐歌单 / 热门歌单 / 每日推荐歌曲
+  - `Liked`：我喜欢的音乐，需要登录
+  - `Search`：搜索歌曲、专辑、歌手、歌单
+  - `账号`：网易云二维码登录和账号状态（provider `extra_sections`）
 - 歌单页支持进入查看歌曲列表
-- 歌曲预览会显示基础元数据，并尝试加载歌词前几行
+- 歌曲预览统一使用 `music.lazydeck` 的通用 preview，不再加载歌词
 - 歌曲条目会显示喜欢状态；按 `l` 可切换喜欢/取消喜欢
-- 在歌曲上按 `Enter`：从当前歌曲开始替换 `mpv` 队列并播放
-- 在歌曲上按 `a`：把当前歌曲追加到 `mpv` 队列
-- 在歌单上按 `A`：把整个歌单追加到 `mpv` 队列
-- 投递到 `mpv` 时使用 `get_play_url(track, cb)` 延迟解析真实播放链接，避免长队列里的签名链接提前过期
+- 在歌曲上按 `Enter`：从当前歌曲开始替换 `/music` 队列并播放
+- 在歌曲上按 `a`：把当前歌曲追加到 `/music` 队列
+- 在歌单上按 `A`：把整个歌单追加到 `/music` 队列
+- 投递到播放器时使用 `get_play_url(track, cb)` 延迟解析真实播放链接，避免长队列里的签名链接提前过期
 
 ## 配置
 
@@ -27,15 +25,15 @@
 
 ```lua
 {
-  dir = 'plugins/mpv.lazycmd',
+  dir = 'plugins/music.lazydeck',
   config = function()
-    require('mpv').setup {
-      socket = '/tmp/lazycmd-mpv.sock',
+    require('music').setup {
+      socket = '/tmp/lazydeck-mpv.sock',
     }
   end,
 },
 {
-  dir = 'plugins/netease-music.lazycmd',
+  dir = 'plugins/netease-music.lazydeck',
   config = function()
     require('netease-music').setup {
       base_url = os.getenv 'NETEASE_MUSIC_API_URL',
@@ -44,6 +42,7 @@
       personalized_limit = 30,
       top_playlist_limit = 50,
       my_playlist_limit = 100,
+      daily_song_limit = 100,
       search_song_limit = 20,
       search_album_limit = 20,
       search_artist_limit = 20,
@@ -65,40 +64,27 @@
 
 - `NETEASE_MUSIC_API_URL`
 
-插件只接受 `base_url` 这类非敏感配置。`cookie` 不再通过 `setup()` 或环境变量传入；如果你在 `账号` 页面完成短信验证码登录、二维码登录，或手动录入 Cookie，插件会把 `cookie`、`uid` 和最近一次使用的手机号都保存到 `lc.secrets`。
+插件只接受 `base_url` 这类非敏感配置。`cookie` 不通过 `setup()` 或环境变量传入；在 `账号` 页面完成二维码登录后，插件会把 `cookie` 和 `uid` 保存到 `deck.secrets`。
 
 ## 登录
 
-在 `账号` 页面里，当前支持三种登录相关流程：
+重构后只保留二维码登录：
 
-- `短信验证码登录`
-  - 先输入手机号，插件调用 `/captcha/sent`
-  - 再输入验证码，插件调用 `/login/cellphone`
-  - 登录成功后会保存返回的 `cookie`
-- `二维码登录`
-  - 插件调用 `/login/qr/key` 和 `/login/qr/create`
-  - 将接口返回的二维码 base64 图片解码后写入临时 PNG 文件
-  - 在预览区展示二维码图片地址、二维码内容地址，以及通过 `lc.style.image(...)` 渲染的二维码原生图片预览
-  - 不再调用系统默认图片浏览器，扫码入口完全留在 lazycmd 预览区
-  - 后台轮询 `/login/qr/check`，扫码确认成功后自动保存 `cookie`
-- `手动输入 Cookie`
-  - 适合从浏览器复制完整 Cookie，或只复制 `MUSIC_U=...`
-  - 保存后插件会立刻调用 `/login/status` 校验登录态并同步 `uid`
-
-登录相关信息通过 `lc.secrets` 保存，包括 `cookie`、`uid` 和最近一次使用的手机号。这样多台机器如果共享同一份 secrets，就可以复用登录态；后续即使 Cookie 失效，插件仍可尝试用保存下来的 `uid` 展示用户歌单。
+- 插件调用 `/login/qr/key` 和 `/login/qr/create`
+- 将接口返回的二维码 base64 图片解码后写入临时 PNG 文件
+- 在预览区展示二维码图片地址、二维码内容地址，以及通过 `deck.style.image(...)` 渲染的二维码图片预览
+- 后台轮询 `/login/qr/check`，扫码确认成功后自动保存 `cookie`
 
 ## 依赖
 
 - `NeteaseCloudMusicApi`
-- `mpv.lazycmd`
+- `music.lazydeck`
 
 ## 接口
 
-当前实现使用这些 API：
+当前主要使用这些 API：
 
 - `/login/status`
-- `/captcha/sent`
-- `/login/cellphone`
 - `/login/qr/key`
 - `/login/qr/create`
 - `/login/qr/check`
@@ -115,11 +101,13 @@
 - `/playlist/track/all`
 - `/cloudsearch`
 - `/song/url/v1`
-- `/lyric`
 
-## 说明
+## 结构
 
-- 这个插件目前聚焦“浏览 + 搜索 + 播放”主流程；已支持喜欢/取消喜欢、短信验证码登录、二维码登录、手动 Cookie 登录，但还没有实现歌单编辑等写操作
-- `每日推荐歌单`、`每日推荐歌曲`、`我的歌单` 是否可用，取决于接口服务端是否接受当前 `cookie`
-- API 响应会同时走内存缓存和 `lc.cache` 持久化缓存，TTL 按接口性质区分：登录态 60 秒，公开推荐/热门歌单 12 小时，我的歌单 3 小时，每日推荐 12 小时，歌单详情 3 小时，搜索 1 天，播放 URL 30 分钟，歌词 30 天
-- `mpv.lazycmd` 会为延迟解析的 track 生成插件内部 localhost URL；每次开始请求某首歌时，网易云插件才会现取最新播放链接
+- `netease-music/init.lua`: 配置检查，并把请求委托给 `music.new(provider)` 创建的 browser
+- `netease-music/provider.lua`: 网易云数据标准化和 `music.lazydeck` provider 接口实现；包含二维码登录 extra section
+- `netease-music/api.lua`: NeteaseCloudMusicApi 请求、缓存、登录态和 secrets 管理
+- `netease-music/config.lua`: 配置归一化
+- `netease-music/shared.lua`: 账号二维码登录页仍复用的基础样式和 preview helper
+
+重构后旧 UI/action 模块已删除，浏览、预览、搜索、推荐和播放动作统一由 `music.lazydeck` 提供。

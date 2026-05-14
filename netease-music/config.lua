@@ -11,13 +11,6 @@ local cfg = {
   search_album_limit = 20,
   search_artist_limit = 20,
   search_playlist_limit = 20,
-  keymap = {
-    append_to_player = 'a',
-    append_playlist_to_player = 'A',
-    search = 's',
-    toggle_like = 'l',
-    play_now = '<enter>',
-  },
 }
 
 local function trim(value)
@@ -38,8 +31,7 @@ local function normalize(next_cfg)
 end
 
 function M.setup(opt)
-  local global_keymap = lc.config.get().keymap
-  cfg = normalize(lc.tbl_deep_extend('force', cfg, { keymap = global_keymap }, opt or {}))
+  cfg = normalize(deck.tbl_deep_extend('force', cfg, opt or {}))
 end
 
 function M.get() return cfg end
