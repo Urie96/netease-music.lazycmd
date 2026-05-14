@@ -121,7 +121,12 @@ local function unique_playlists(playlists)
 end
 
 local function qr_image_path(token)
-  return '/tmp/lazydeck-netease-music-qr-' .. tostring(token or 'latest') .. '.png'
+  local path, err = deck.fs.tempfile({
+    prefix = 'lazydeck-netease-music-qr-' .. tostring(token or 'latest') .. '-',
+    suffix = '.png',
+  })
+  if not path then error('创建二维码临时文件失败: ' .. tostring(err)) end
+  return path
 end
 
 local function preview_lines(lines) return shared.preview_lines(lines) end
