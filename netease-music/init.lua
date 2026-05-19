@@ -1,5 +1,13 @@
 local M = {}
 
+function M.meta()
+  return {
+    icon = '󰎆',
+    desc = 'NetEase Cloud Music browser',
+    color = 'red',
+  }
+end
+
 local api = require 'netease-music.api'
 local config = require 'netease-music.config'
 local provider = require 'netease-music.provider'
