@@ -132,7 +132,7 @@ end
 local function preview_lines(lines) return shared.preview_lines(lines) end
 
 local function qr_preview_widget(qr)
-  local image_path = qr and qr.img and qr_image_path(qr.token) or nil
+  local image_path = qr and qr.image_path or nil
   local text = preview_lines {
     deck.style.line { shared.accent '二维码登录' },
     '',
@@ -167,6 +167,7 @@ local function write_qr_image(session)
   local image_path = qr_image_path(session and session.token)
   local ok, err = deck.fs.write_file_sync(image_path, decoded)
   if not ok then error('写入二维码图片失败: ' .. tostring(err)) end
+  api.set_qr_image_path(session and session.token, image_path)
   return image_path
 end
 
@@ -303,6 +304,25 @@ function M.get_playlist_tracks(playlist_id, cb)
     cb(map_items(songs, normalize_track, {
       parent = normalize_playlist(playlist),
       list_source = 'playlist',
+    }))
+  end)
+end
+
+function M.get_album_tracks(album_id, cb)
+  api.get_album_detail(album_id, function(album, songs, err)
+    if err then return cb(nil, err) end
+    cb(map_items(songs, normalize_track, {
+      parent = normalize_album(album),
+      list_source = 'album',
+    }))
+  end)
+end
+
+function M.get_artist_albums(artist_id, cb)
+  api.get_artist_albums(artist_id, function(albums, err)
+    if err then return cb(nil, err) end
+    cb(map_items(albums, normalize_album, {
+      list_source = 'artist',
     }))
   end)
 end

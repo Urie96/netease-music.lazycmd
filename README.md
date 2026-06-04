@@ -9,9 +9,10 @@
   - `Playlists`：我的歌单，需要 UID 或可用登录态
   - `Recommendations`：推荐歌单 / 热门歌单 / 每日推荐歌曲
   - `Liked`：我喜欢的音乐，需要登录
-  - `Search`：搜索歌曲、专辑、歌手、歌单
+  - `Search`：搜索歌曲、专辑、歌手、歌单；搜索结果中的歌单、专辑、歌手可继续进入查看歌曲
   - `账号`：网易云二维码登录和账号状态（provider `extra_sections`）
 - 歌单页支持进入查看歌曲列表
+- 歌手搜索结果支持进入专辑列表，再进入查看歌曲列表
 - 歌曲预览统一使用 `music.lazydeck` 的通用 preview，不再加载歌词
 - 歌曲条目会显示喜欢状态；按 `l` 可切换喜欢/取消喜欢
 - 在歌曲上按 `Enter`：从当前歌曲开始替换 `/music` 队列并播放
@@ -99,6 +100,8 @@
 - `/recommend/songs`
 - `/playlist/detail`
 - `/playlist/track/all`
+- `/album`
+- `/artist/album`
 - `/cloudsearch`
 - `/song/url/v1`
 

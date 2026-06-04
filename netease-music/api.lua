@@ -15,6 +15,7 @@ local state = {
     key = nil,
     url = nil,
     img = nil,
+    image_path = nil,
     status = 'idle',
     message = nil,
     code = nil,
@@ -37,6 +38,8 @@ local cache_ttl = {
   daily_songs = 43200,
   playlist_meta = 10800,
   playlist_tracks = 10800,
+  album_tracks = 10800,
+  artist_albums = 10800,
   search = 86400,
   song_urls = 1800,
   lyric = 2592000,
@@ -248,6 +251,7 @@ function M.get_qr_login_state()
     key = session.key,
     url = session.url,
     img = session.img,
+    image_path = session.image_path,
     status = session.status,
     message = session.message,
     code = session.code,
@@ -399,6 +403,7 @@ function M.start_qr_login(cb)
     key = nil,
     url = nil,
     img = nil,
+    image_path = nil,
     status = 'starting',
     message = '正在生成二维码',
     code = nil,
@@ -462,6 +467,13 @@ function M.start_qr_login(cb)
       cb(M.get_qr_login_state())
     end)
   end)
+end
+
+function M.set_qr_image_path(token, image_path)
+  local session = state.qr_login or {}
+  if token and session.token ~= token then return false end
+  update_qr_login_state { image_path = image_path }
+  return true
 end
 
 function M.poll_qr_login(token, cb)
@@ -883,6 +895,31 @@ function M.get_playlist_detail(playlist_id, cb)
         end)
       end
     )
+  end)
+end
+
+function M.get_album_detail(album_id, cb)
+  local params = { id = album_id }
+  get_cached_json('album-tracks', params, cache_ttl.album_tracks, function(done) request_json('/album', params, done) end, function(payload, err)
+    if err then
+      cb(nil, nil, err)
+      return
+    end
+
+    M.apply_song_like_state(payload.songs or {}, function(songs)
+      cb(payload.album or {}, songs or {})
+    end)
+  end)
+end
+
+function M.get_artist_albums(artist_id, cb)
+  local params = { id = artist_id, limit = 100 }
+  get_cached_json('artist-albums', params, cache_ttl.artist_albums, function(done) request_json('/artist/album', params, done) end, function(payload, err)
+    if err then
+      cb(nil, err)
+      return
+    end
+    cb(payload.hotAlbums or {})
   end)
 end
 
